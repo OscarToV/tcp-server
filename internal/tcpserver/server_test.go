@@ -9,7 +9,7 @@ import (
 func TestServerInitialization(t *testing.T) {
 	// Set up the server
 	addr := "localhost:8080"
-	server := New(addr)
+	server := New(addr, 5)
 
 	// Start server in a goroutine so that it doesn't block
 	go func() {

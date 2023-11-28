@@ -13,7 +13,7 @@ func main() {
 		log.Fatalf("Unable to load configuration: %v", err)
 	}
 
-	server := tcpserver.New(config.ServerAddress)
+	server := tcpserver.New(config.ServerAddress, 5)
 	if err := server.Start(); err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
