@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	config, err := configs.LoadConfig("./configs/config.json")
+	config, err := configs.LoadConfig("../../configs/config.json")
 	if err != nil {
 		log.Fatalf("Unable to load configuration: %v", err)
 	}

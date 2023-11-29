@@ -2,6 +2,8 @@ package tcpserver
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"sync"
 )
@@ -33,7 +35,7 @@ func New(address string, maxConnections int) *Server {
 		maxConnections: maxConnections,
 	}
 	server.connCond = sync.NewCond(&server.connLock)
-	return &Server{address: address}
+	return server
 }
 
 func (s *Server) Start() error {
@@ -70,6 +72,7 @@ func (s *Server) acceptLoop() {
 		// Register the new connection
 		s.activeConnections++
 		s.connLock.Unlock()
+		log.Print("New connection accepted")
 
 		// Handle the connection in a separate goroutine
 		go s.handleConnection(conn)
@@ -85,5 +88,25 @@ func (s *Server) handleConnection(conn net.Conn) {
 		s.connCond.Broadcast() // Notify that a connection slot is free
 		s.connLock.Unlock()
 	}()
-	// Here, you'd handle your connection, such as reading message, etc.
+
+	buf := make([]byte, 1024) // Buffer for reading data
+
+	for {
+		// Read from the connection
+		n, err := conn.Read(buf)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Printf("Read error: %v\n", err)
+			}
+			break
+		}
+		data := buf[:n]
+
+		// Echo de data back to the client
+		_, err = conn.Write(data)
+		if err != nil {
+			fmt.Printf("Write error: %v\n", err)
+			break // Failed to write to the connection
+		}
+	}
 }
