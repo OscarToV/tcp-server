@@ -23,8 +23,10 @@ type Server struct {
 	// Connection management
 	maxConnections    int
 	activeConnections int
-	connLock          sync.Mutex // Protects activeConnections
-	connCond          *sync.Cond // Used to wait for free connection slots
+	connLock          sync.Mutex     // Protects activeConnections
+	connCond          *sync.Cond     // Used to wait for free connection slots
+	shutdown          chan struct{}  // Channel to signal server shutdown
+	wg                sync.WaitGroup // WaitGroup to wait for goroutines to finish
 }
 
 func New(address string, maxConnections int) *Server {
@@ -33,6 +35,7 @@ func New(address string, maxConnections int) *Server {
 		quitch:         make(chan struct{}),
 		msgch:          make(chan Message, 10),
 		maxConnections: maxConnections,
+		shutdown:       make(chan struct{}),
 	}
 	server.connCond = sync.NewCond(&server.connLock)
 	return server
@@ -58,8 +61,12 @@ func (s *Server) acceptLoop() {
 	for {
 		conn, err := s.ln.Accept()
 		if err != nil {
-			fmt.Printf("error accepting connection: %v\n", err)
-			continue
+			select {
+			case <-s.shutdown:
+				return // Server is shutting down
+			default:
+				fmt.Printf("error accepting connection: %v\n", err)
+			}
 		}
 
 		// check if we've reached the maximum number of connections
@@ -81,6 +88,8 @@ func (s *Server) acceptLoop() {
 
 // handleConnection processes a single client connection.
 func (s *Server) handleConnection(conn net.Conn) {
+	s.wg.Add(1)       // Increment the waitGrooup counter
+	defer s.wg.Done() // Decrement the counter when the goroutine completes
 	defer func() {
 		conn.Close()
 		s.connLock.Lock()
@@ -109,4 +118,14 @@ func (s *Server) handleConnection(conn net.Conn) {
 			break // Failed to write to the connection
 		}
 	}
+}
+
+func (s *Server) Shutdown() {
+	close(s.shutdown) // Signal all goroutines to stop
+	s.ln.Close()      // Close the listener
+
+	s.wg.Wait() // wait for all goroutines to finish
+
+	close(s.msgch)  // Close the message channel
+	close(s.quitch) //
 }
